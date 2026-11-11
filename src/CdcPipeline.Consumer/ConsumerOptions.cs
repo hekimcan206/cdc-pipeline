@@ -42,6 +42,9 @@ public sealed class SearchOptions
 
     public string? ApiKey { get; set; }
 
+    /// <summary>Prepended to every index name (customers, orders, order_lines); lets several read models share one server.</summary>
+    public string IndexPrefix { get; set; } = "";
+
     [Range(1, 10_000)]
     public int BatchSize { get; set; } = 1000;
 

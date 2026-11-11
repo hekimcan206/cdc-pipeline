@@ -62,6 +62,7 @@ internal sealed partial class SearchIndexer(
 
         await EnsureIndexesAsync(stoppingToken);
         var idle = TimeSpan.FromMilliseconds(_options.PollIntervalMs);
+        var nextPrune = DateTime.UtcNow;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -70,6 +71,12 @@ internal sealed partial class SearchIndexer(
                 foreach (var projection in writer.Projections)
                 {
                     pushed += await IndexPendingAsync(projection, stoppingToken);
+                }
+
+                if (DateTime.UtcNow >= nextPrune)
+                {
+                    await PruneTransactionLedgerAsync(stoppingToken);
+                    nextPrune = DateTime.UtcNow.AddSeconds(30);
                 }
 
                 if (pushed == 0)
@@ -89,6 +96,19 @@ internal sealed partial class SearchIndexer(
         }
     }
 
+    /// <summary>
+    /// The per-event ledger only has to outlive redeliveries of a transaction, which come from uncommitted offsets, i.e.
+    /// seconds. Ten minutes after completion its rows go; the rm_tx summary row stays.
+    /// </summary>
+    private async Task PruneTransactionLedgerAsync(CancellationToken ct)
+    {
+        await using var cmd = dataSource.CreateCommand("""
+            DELETE FROM rm_tx_event e USING rm_tx t
+            WHERE e.source = t.source AND e.tx_id = t.tx_id AND t.completed_at < clock_timestamp() - interval '10 minutes'
+            """);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     private async Task EnsureIndexesAsync(CancellationToken ct)
     {
         foreach (var projection in writer.Projections)
@@ -97,7 +117,7 @@ internal sealed partial class SearchIndexer(
             {
                 try
                 {
-                    await meili.EnsureIndexAsync(projection.Contract.SourceTable, ct);
+                    await meili.EnsureIndexAsync(IndexUid(projection), ct);
                     break;
                 }
                 catch (HttpRequestException ex) when (attempt < 30)
@@ -181,7 +201,7 @@ internal sealed partial class SearchIndexer(
             return 0;
         }
 
-        var uid = contract.SourceTable;
+        var uid = IndexUid(projection);
         if (upserts.Count > 0)
         {
             await meili.AddOrReplaceAsync(uid, upserts, ct);
@@ -220,6 +240,8 @@ internal sealed partial class SearchIndexer(
 
         return marks.Count;
     }
+
+    private string IndexUid(ProjectionSql projection) => _options.IndexPrefix + projection.Contract.SourceTable;
 
     public static string DocumentId(string source, IEnumerable<object> key) =>
         string.Join('-', key.Select(k => Convert.ToString(k, CultureInfo.InvariantCulture)).Prepend(source));
