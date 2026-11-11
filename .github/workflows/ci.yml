@@ -118,6 +118,13 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
           restore-keys: nuget-${{ runner.os }}-
 
+      # The Oracle image alone is 6.5 GB; without this Redpanda dropped below its free-disk threshold and refused writes.
+      - name: Free runner disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/swift /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - name: Pull pipeline images
         run: |
           for image in gvenzl/oracle-free:23-slim-faststart postgres:17-alpine redpandadata/redpanda:v26.2.6 quay.io/debezium/server:3.7.1.Final getmeili/meilisearch:v1.56.2; do

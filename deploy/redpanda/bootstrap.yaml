@@ -4,3 +4,6 @@
 auto_create_topics_enabled: true
 default_topic_partitions: 3
 default_topic_replications: 1
+# Redpanda refuses writes (KAFKA_STORAGE_ERROR) once free disk drops below this threshold, 5 GiB by default. The
+# Oracle CI job hit that on a GitHub runner after pulling the 6.5 GB Oracle image; 1 GiB is plenty for a demo log.
+storage_min_free_bytes: 1073741824
