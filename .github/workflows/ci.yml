@@ -1,0 +1,189 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  build-test:
+    name: build & test (unit + PostgreSQL pipeline end to end)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore
+
+      # Package versions are pinned and updated by hand, so a known vulnerability in any direct or
+      # transitive package fails the build. Fix it with a pinned upgrade in Directory.Packages.props.
+      - name: Audit for vulnerable packages
+        run: |
+          set -o pipefail
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerable-packages.txt
+          if grep -q "has the following vulnerable packages" vulnerable-packages.txt; then
+            echo "::error::Known-vulnerable NuGet packages found (see the list above)"
+            exit 1
+          fi
+
+      - name: Format check
+        run: dotnet format --verify-no-changes --no-restore
+
+      - name: Build (warnings are errors)
+        run: dotnet build --no-restore --configuration Release
+
+      # Pull the pipeline images up front so container start-up time does not count against test timeouts.
+      - name: Pull pipeline images
+        run: |
+          for image in postgres:17-alpine redpandadata/redpanda:v26.2.6 quay.io/debezium/server:3.7.1.Final getmeili/meilisearch:v1.56.2; do
+            docker pull --quiet "$image" &
+          done
+          wait
+
+      # Unit, golden and property tests, then the PostgreSQL pipeline end to end through Testcontainers:
+      # source PostgreSQL (pgoutput) -> Debezium Server -> Redpanda -> consumer -> read model + Meilisearch,
+      # including the hard-kill crash test and live schema evolution. The Oracle tests skip here (own job below).
+      - name: Test
+        run: >
+          dotnet test --no-build --configuration Release
+          --coverage --coverage-output-format cobertura
+          --results-directory "${{ github.workspace }}/TestResults"
+
+      - name: Coverage summary
+        if: always()
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.5.12
+        with:
+          reports: TestResults/**/*.cobertura.xml
+          targetdir: coverage
+          reporttypes: MarkdownSummaryGithub
+          assemblyfilters: "-*Tests*;-CdcPipeline.TestKit;-CdcPipeline.Bench"
+          filefilters: "-*/obj/*"
+
+      - name: Publish coverage to job summary
+        if: always()
+        run: |
+          if [ -f coverage/SummaryGithub.md ]; then
+            cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No coverage report produced."
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: test-results
+          path: TestResults/
+          retention-days: 7
+
+  # Oracle Database 23ai Free + LogMiner + Debezium + Redpanda + read model + Meilisearch: about 3.5 GB, which fits a
+  # standard runner. The init script switches the database to ARCHIVELOG before the image reports ready.
+  oracle:
+    name: Oracle LogMiner pipeline end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Pull pipeline images
+        run: |
+          for image in gvenzl/oracle-free:23-slim-faststart postgres:17-alpine redpandadata/redpanda:v26.2.6 quay.io/debezium/server:3.7.1.Final getmeili/meilisearch:v1.56.2; do
+            docker pull --quiet "$image" &
+          done
+          wait
+
+      - name: Build
+        run: dotnet build tests/CdcPipeline.IntegrationTests --configuration Release
+
+      - name: Oracle tests
+        env:
+          CDC_ORACLE_TESTS: "1"
+        run: >
+          dotnet test --project tests/CdcPipeline.IntegrationTests --no-build --configuration Release
+          -- --filter-class "*OraclePipelineTests"
+
+  container:
+    name: container image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build consumer image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: cdc-pipeline-consumer:ci
+          cache-from: type=gha,scope=consumer
+          cache-to: type=gha,mode=max,scope=consumer
+
+      - name: Verify the image runs as non-root
+        run: |
+          user=$(docker image inspect cdc-pipeline-consumer:ci --format '{{.Config.User}}')
+          echo "user: ${user}"
+          test -n "${user}" && test "${user}" != "0" && test "${user}" != "root"
+
+  compose-demo:
+    name: docker compose demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # The README promises `docker compose up` runs the whole demo with zero manual steps; this job keeps it true.
+      - name: Start the stack
+        run: docker compose up -d --build
+
+      - name: The demo's changes reach the read model and the search index
+        run: |
+          code=$(docker wait "$(docker compose ps -aq demo)")
+          docker compose logs --no-log-prefix demo | tee demo.log
+          test "${code}" = "0"
+          grep -q '"ok":true' demo.log
+
+      - name: The consumer reports ready and counts the applied changes
+        run: |
+          curl -fsS http://127.0.0.1:58080/health/ready
+          curl -fsS http://127.0.0.1:58080/stats | tee stats.json
+          grep -q '"status":"running"' stats.json
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs

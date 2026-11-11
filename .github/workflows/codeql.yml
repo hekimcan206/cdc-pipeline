@@ -1,0 +1,64 @@
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: manual
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        if: matrix.language == 'csharp'
+        with:
+          global-json-file: global.json
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+
+      # Manual build mode: CodeQL observes the real compilation (same flags as CI), which gives the most
+      # precise data-flow analysis for C#.
+      - name: Build
+        if: matrix.build-mode == 'manual'
+        run: dotnet build --configuration Release
+
+      # Private repositories without GitHub Code Security cannot receive code-scanning uploads, so the
+      # analysis still runs and its SARIF is kept as an artifact instead. Public repositories upload.
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: ${{ github.event.repository.private && 'never' || 'always' }}
+          output: sarif-results
+
+      - uses: actions/upload-artifact@v7
+        if: github.event.repository.private
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: sarif-results/
+          retention-days: 30
