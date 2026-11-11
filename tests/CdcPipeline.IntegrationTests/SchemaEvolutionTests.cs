@@ -29,11 +29,11 @@ public sealed class SchemaEvolutionTests(PostgresPipelineFixture fixture)
             // Restore the original column name even when an assertion failed, so the tests sharing this stack (and the
             // workload, which writes 'email') are not broken by this one. The v2 alias accepts both names.
             await writer.ExecuteDdlAsync("""
-                DO $ BEGIN
+                DO $$ BEGIN
                     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'customers' AND column_name = 'email_address') THEN
                         ALTER TABLE customers RENAME COLUMN email_address TO email;
                     END IF;
-                END $
+                END $$
                 """, CancellationToken.None);
         }
     }
