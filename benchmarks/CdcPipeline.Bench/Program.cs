@@ -186,21 +186,40 @@ namespace CdcPipeline.Bench
             await workload.RunAsync(rate * seconds, rate, ct);
             await Waiter.UntilAsync(() => TopicsSettledAsync(stack, ct), TimeSpan.FromMinutes(5), "Debezium to publish the backlog", ct);
 
-            var clock = Stopwatch.StartNew();
-            double rmSeconds;
-            double indexSeconds;
+            // Timestamps come from the read-model database clock (start, last applied row, last indexed row), so the
+            // convergence polling below only decides when to stop looking; its 1 s interval does not round the result.
+            var started = await probe.ScalarAsync<DateTime>("SELECT clock_timestamp()", ct);
             await using (await StartConsumerAsync(stack, readModel, "bench_catchup"))
             {
-                await Waiter.UntilAsync(async () => (await probe.ReconcileAsync(writer, workload.FirstId, workload.LastId, false, ct)).Count == 0,
-                    TimeSpan.FromMinutes(10), "read model catch-up", ct);
-                rmSeconds = clock.Elapsed.TotalSeconds;
-                await Waiter.UntilAsync(async () => await probe.DirtyRowsAsync(ct) == 0, TimeSpan.FromMinutes(10), "index catch-up", ct);
-                indexSeconds = clock.Elapsed.TotalSeconds;
+                await PollUntilAsync(async () => (await probe.ReconcileAsync(writer, workload.FirstId, workload.LastId, false, ct)).Count == 0, "read model catch-up", ct);
+                await PollUntilAsync(async () => await probe.DirtyRowsAsync(ct) == 0, "index catch-up", ct);
             }
+
+            var window = $"BETWEEN {workload.FirstId} AND {workload.LastId}";
+            var lastApplied = await probe.ScalarAsync<DateTime>(
+                $"SELECT max(t) FROM (SELECT max(applied_at) t FROM rm_customer WHERE id {window} UNION ALL SELECT max(applied_at) FROM rm_order WHERE id {window} UNION ALL SELECT max(applied_at) FROM rm_order_line WHERE order_id {window}) x", ct);
+            var lastIndexed = await probe.ScalarAsync<DateTime>(
+                $"SELECT max(t) FROM (SELECT max(indexed_at) t FROM rm_customer WHERE id {window} UNION ALL SELECT max(indexed_at) FROM rm_order WHERE id {window} UNION ALL SELECT max(indexed_at) FROM rm_order_line WHERE order_id {window}) x", ct);
+            var rmSeconds = (lastApplied - started).TotalSeconds;
+            var indexSeconds = (lastIndexed - started).TotalSeconds;
 
             var backlogEvents = await probe.CounterAsync("events_applied", ct) - appliedBefore;
             return new CatchUpResult(rate, seconds, workload.RowChanges, backlogEvents, Math.Round(rmSeconds, 2), Math.Round(indexSeconds, 2),
                 Math.Round(backlogEvents / rmSeconds, 0));
+        }
+
+        private static async Task PollUntilAsync(Func<Task<bool>> condition, string what, CancellationToken ct)
+        {
+            var deadline = DateTime.UtcNow.AddMinutes(10);
+            while (!await condition())
+            {
+                if (DateTime.UtcNow > deadline)
+                {
+                    throw new TimeoutException($"Timed out waiting for {what}.");
+                }
+
+                await Task.Delay(1000, ct);
+            }
         }
 
         private static async Task<bool> IdleAsync(ReadModelProbe probe, CancellationToken ct)

@@ -1,0 +1,89 @@
+{
+  "source": "ora",
+  "environment": {
+    "os": "Microsoft Windows 10.0.26200",
+    "cpu": "16 logical cores",
+    "dotnet": ".NET 10.0.12",
+    "config": "Release",
+    "date": "2026-11-11"
+  },
+  "stackStartupSeconds": 84.6,
+  "lag": [
+    {
+      "OfferedOpsPerSecond": 25,
+      "Seconds": 20,
+      "Operations": 500,
+      "RowChanges": 731,
+      "AchievedRowChangesPerSecond": 36.6,
+      "MeasuredRows": 501,
+      "ReadModelLagMs": {
+        "P50": 2003.6,
+        "P95": 3705.3,
+        "P99": 3864.4,
+        "Max": 4011.5
+      },
+      "IndexLagMs": {
+        "P50": 2230.6,
+        "P95": 3883.5,
+        "P99": 4003.9,
+        "Max": 4221.5
+      }
+    },
+    {
+      "OfferedOpsPerSecond": 100,
+      "Seconds": 20,
+      "Operations": 2000,
+      "RowChanges": 2798,
+      "AchievedRowChangesPerSecond": 139.9,
+      "MeasuredRows": 1904,
+      "ReadModelLagMs": {
+        "P50": 2221.4,
+        "P95": 3583.5,
+        "P99": 3941.4,
+        "Max": 4138
+      },
+      "IndexLagMs": {
+        "P50": 2595.3,
+        "P95": 3864,
+        "P99": 4246.9,
+        "Max": 4476
+      }
+    },
+    {
+      "OfferedOpsPerSecond": 200,
+      "Seconds": 20,
+      "Operations": 4000,
+      "RowChanges": 5624,
+      "AchievedRowChangesPerSecond": 281.2,
+      "MeasuredRows": 3858,
+      "ReadModelLagMs": {
+        "P50": 2421,
+        "P95": 3650.7,
+        "P99": 3998.7,
+        "Max": 4157.9
+      },
+      "IndexLagMs": {
+        "P50": 2834.6,
+        "P95": 4026.3,
+        "P99": 4358.7,
+        "Max": 4614.7
+      }
+    }
+  ],
+  "catchUp": {
+    "OfferedOpsPerSecond": 150,
+    "DowntimeSeconds": 30,
+    "RowChanges": 6304,
+    "BacklogEvents": 6301,
+    "ReadModelCatchUpSeconds": 6.74,
+    "IndexCatchUpSeconds": 7.71,
+    "DrainEventsPerSecond": 934
+  },
+  "memoryAfterRunMiB": {
+    "source": 3005.4,
+    "redpanda": 126.1,
+    "debezium": 463.3,
+    "readmodel": 75,
+    "meilisearch": 82.8
+  }
+}
