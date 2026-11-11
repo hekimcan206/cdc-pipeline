@@ -12,6 +12,9 @@ public sealed class ConsumerOptions
     [Required]
     public string GroupId { get; set; } = "cdc-read-model";
 
+    /// <summary>Optional static group membership id (one per instance); restarts then skip the rebalance wait.</summary>
+    public string? GroupInstanceId { get; set; }
+
     /// <summary>Regex subscription: data topics of both pipelines plus their transaction topics.</summary>
     [Required]
     public string TopicPattern { get; set; } = @"^(pg|ora)\..+";

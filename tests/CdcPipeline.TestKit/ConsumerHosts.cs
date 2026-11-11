@@ -17,6 +17,8 @@ public sealed record ConsumerSettings(string KafkaBootstrap, string ReadModelCon
 {
     public string ContractVersion { get; init; } = "v2";
 
+    public string? GroupInstanceId { get; init; }
+
     public int MaxBatchSize { get; init; } = 500;
 
     public int TransactionWaitMs { get; init; } = 5000;
@@ -31,6 +33,7 @@ public sealed record ConsumerSettings(string KafkaBootstrap, string ReadModelCon
         ["Consumer:KafkaBootstrap"] = KafkaBootstrap,
         ["Consumer:ReadModelConnectionString"] = ReadModelConnectionString,
         ["Consumer:GroupId"] = GroupId,
+        ["Consumer:GroupInstanceId"] = GroupInstanceId,
         ["Consumer:ContractVersion"] = ContractVersion,
         ["Consumer:MaxBatchSize"] = MaxBatchSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
         ["Consumer:RetryDelayMs"] = "200",

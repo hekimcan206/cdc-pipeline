@@ -36,6 +36,9 @@ internal sealed partial class ChangeConsumer(
         {
             BootstrapServers = _options.KafkaBootstrap,
             GroupId = _options.GroupId,
+            // Static membership: a restarted instance with the same id takes its partitions back at once instead of
+            // waiting for the coordinator to evict the dead member after the session timeout.
+            GroupInstanceId = string.IsNullOrWhiteSpace(_options.GroupInstanceId) ? null : _options.GroupInstanceId,
             EnableAutoCommit = false,
             AutoOffsetReset = AutoOffsetReset.Earliest,
             // Regex subscriptions only see topics after a metadata refresh; Debezium creates topics lazily.

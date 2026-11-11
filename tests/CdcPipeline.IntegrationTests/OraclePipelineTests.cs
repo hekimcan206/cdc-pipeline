@@ -45,7 +45,7 @@ public sealed class OraclePipelineTests(OraclePipelineFixture fixture, ITestOutp
                 var stats = await consumer.StatsAsync();
                 throw new TimeoutException(
                     $"{ex.Message}\nconsumer exited={consumer.HasExited} stats={stats}\ntopics={string.Join(",", await stack.ListTopicsAsync())}\n" +
-                    $"Debezium:\n{string.Join("\n", logs.Split('\n').Where(l => l.Contains("WARN", StringComparison.Ordinal) || l.Contains("ERROR", StringComparison.Ordinal)).TakeLast(15))}", ex);
+                    $"Debezium:\n{string.Join("\n", logs.Split('\n').Where(l => l.Contains("WARN", StringComparison.Ordinal) || l.Contains("ERROR", StringComparison.Ordinal)).Where(l => !l.Contains("Agroal", StringComparison.Ordinal) && !l.Contains("quarkus.config", StringComparison.Ordinal)).Take(12))}", ex);
             }
         }
         finally

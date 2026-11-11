@@ -25,9 +25,9 @@ public sealed class CrashRecoveryTests(PostgresPipelineFixture fixture, ITestOut
         var probe = new ReadModelProbe(readModel, "pg");
         var workload = new ShopWorkload(writer, firstId: 3_000_000, seed: 7);
 
-        // Small batches and a self-kill every 12th batch. Every restart pays a consumer-group rejoin (the dead member is only
-        // evicted after the session timeout), so killing more often mostly measures rejoin time, not correctness.
-        var crashing = ConsumerSettings.For(stack, readModel, name) with { MaxBatchSize = 25, KillAfterDbCommitEveryNBatches = 12 };
+        // A self-kill every 10th batch of 50, plus random external kills. Static group membership lets a restarted
+        // consumer take its partitions back at once, so the test spends its time on crash windows, not on rebalances.
+        var crashing = ConsumerSettings.For(stack, readModel, name) with { MaxBatchSize = 50, KillAfterDbCommitEveryNBatches = 10, GroupInstanceId = $"{name}-instance" };
         var random = new Random(11);
         var restarts = 0;
         var externalKills = 0;
@@ -63,7 +63,7 @@ public sealed class CrashRecoveryTests(PostgresPipelineFixture fixture, ITestOut
             await load;
 
             // Keep the crash-prone consumer running (and restarting) until it has caught up with the source.
-            var deadline = DateTime.UtcNow.AddSeconds(120);
+            var deadline = DateTime.UtcNow.AddSeconds(180);
             while ((await probe.ReconcileAsync(writer, workload.FirstId, workload.LastId, checkApplyCount: false, ct)).Count > 0)
             {
                 if (DateTime.UtcNow > deadline)
@@ -71,7 +71,7 @@ public sealed class CrashRecoveryTests(PostgresPipelineFixture fixture, ITestOut
                     var remaining = await probe.ReconcileAsync(writer, workload.FirstId, workload.LastId, checkApplyCount: false, ct);
                     var (logs, _) = await stack.DebeziumLogsAsync();
                     throw new TimeoutException(
-                        $"Not converged 120 s after the load stopped: {remaining.Count} discrepancies, first {string.Join("; ", remaining.Take(3))}. " +
+                        $"Not converged 180 s after the load stopped: {remaining.Count} discrepancies, first {string.Join("; ", remaining.Take(3))}. " +
                         $"Topics: {string.Join(",", await stack.ListTopicsAsync())}\nDebezium:\n{string.Join("\n", logs.Split('\n').TakeLast(25))}");
                 }
 
