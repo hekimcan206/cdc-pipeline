@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>CdcPipeline.Core</RootNamespace>
+    <Description>Debezium envelope parsing, source positions and versioned entity contracts. No I/O.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CdcPipeline.UnitTests" />
+  </ItemGroup>
+
+</Project>

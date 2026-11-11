@@ -1,0 +1,35 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+publish/
+
+# Tests and coverage
+TestResults/
+coverage/
+*.coverage
+*.cobertura.xml
+
+# IDEs
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+
+# Secrets and local environment
+.env
+appsettings.*.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+BenchmarkDotNet.Artifacts/
+*.db
+*.db-wal
+*.db-shm
+__pycache__/
+node_modules/
+benchmark-results/*.tmp

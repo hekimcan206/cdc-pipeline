@@ -1,0 +1,24 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Warnings are bugs that have not happened yet: fail the build instead of accumulating them. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: XML docs are generated for OpenAPI descriptions, not mandated on every public member.
+         CS1573: documenting only the non-obvious parameters of a record is deliberate. -->
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <Version>1.0.0</Version>
+    <Authors>hekimcan206</Authors>
+    <Copyright>Copyright (c) hekimcan206</Copyright>
+  </PropertyGroup>
+</Project>
