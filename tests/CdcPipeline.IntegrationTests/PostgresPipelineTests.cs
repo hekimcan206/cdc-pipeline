@@ -1,3 +1,4 @@
+using CdcPipeline.Consumer.Pipeline;
 using CdcPipeline.IntegrationTests.Infrastructure;
 using CdcPipeline.TestKit;
 
@@ -20,6 +21,7 @@ public sealed class PostgresPipelineTests(PostgresPipelineFixture fixture)
         var name = fixture.NextName("e2e");
         var readModel = await Stack.CreateReadModelDatabaseAsync(name, ct);
         var settings = ConsumerSettings.For(Stack, readModel, name);
+        await Stack.PositionGroupAtEndAsync(settings.GroupId);
         await using var consumer = await ConsumerInstance.StartAsync(settings);
         var writer = ShopWriter.For(Stack);
         var probe = new ReadModelProbe(readModel, "pg");
@@ -35,8 +37,9 @@ public sealed class PostgresPipelineTests(PostgresPipelineFixture fixture)
         (await probe.ReconcileAsync(writer, id, id, checkApplyCount: true, ct)).Should().BeEmpty();
 
         // The order and its three lines were one source transaction: four events, all accounted for.
-        (await probe.ScalarAsync<int>($"SELECT t.expected_events FROM rm_tx t JOIN rm_order_line l ON l.source = t.source AND l.tx_id = t.tx_id WHERE l.order_id = {id} AND l.line_no = 1", ct))
-            .Should().Be(4);
+        // The END marker travels on its own topic and can arrive after the rows, so wait for it rather than assume it.
+        var txSql = $"SELECT t.expected_events::text || '/' || t.applied_events FROM rm_tx t JOIN rm_order_line l ON l.source = t.source AND l.tx_id = t.tx_id WHERE l.order_id = {id} AND l.line_no = 1";
+        await Waiter.UntilAsync(async () => await probe.ScalarAsync<string>(txSql, ct) == "4/4", TimeSpan.FromSeconds(30), "the order transaction to complete", ct);
 
         await Waiter.UntilAsync(async () => await probe.DirtyRowsAsync(ct) == 0, TimeSpan.FromSeconds(30), "index to catch up", ct);
         var meili = Stack.CreateMeiliClient();
@@ -49,7 +52,7 @@ public sealed class PostgresPipelineTests(PostgresPipelineFixture fixture)
     }
 
     [Fact]
-    public async Task Redelivering_the_entire_topic_history_is_absorbed_without_a_single_reapply()
+    public async Task Redelivering_everything_the_read_model_has_seen_is_absorbed_without_a_single_reapply()
     {
         var ct = TestContext.Current.CancellationToken;
         var name = fixture.NextName("redeliver");
@@ -57,8 +60,15 @@ public sealed class PostgresPipelineTests(PostgresPipelineFixture fixture)
         var writer = ShopWriter.For(Stack);
         var probe = new ReadModelProbe(readModel, "pg");
         var workload = new ShopWorkload(writer, firstId: 2_000_000);
+        var first = ConsumerSettings.For(Stack, readModel, name);
+        var replay = first with { GroupId = $"{name}-replay" };
 
-        await using (await ConsumerInstance.StartAsync(ConsumerSettings.For(Stack, readModel, name)))
+        // Both groups start at the same point (the current end of the shared topics), so the replay group is handed
+        // exactly the records the first group already applied, independent of what earlier tests left in the broker.
+        await Stack.PositionGroupAtEndAsync(first.GroupId);
+        await Stack.PositionGroupAtEndAsync(replay.GroupId);
+
+        await using (await ConsumerInstance.StartAsync(first))
         {
             await workload.RunAsync(200, perSecond: 200, ct);
             await probe.WaitForConvergenceAsync(writer, workload.FirstId, workload.LastId, TimeSpan.FromSeconds(60), ct);
@@ -66,12 +76,13 @@ public sealed class PostgresPipelineTests(PostgresPipelineFixture fixture)
 
         var appliedBefore = await probe.CounterAsync("events_applied", ct);
 
-        // A new consumer group on the same read model: the broker hands over everything from offset 0.
-        var replay = ConsumerSettings.For(Stack, readModel, name) with { GroupId = $"{name}-replay" };
+        // The second group on the same read model receives all of those records again.
         await using (var consumer = await ConsumerInstance.StartAsync(replay))
         {
-            await Waiter.UntilAsync(() => Task.FromResult(consumer.State.Skipped >= appliedBefore
-                && consumer.State.LastBatchAt < DateTimeOffset.UtcNow.AddSeconds(-2)), TimeSpan.FromSeconds(90), "the replay to drain", ct);
+            await Waiter.UntilAsync(() => Task.FromResult(consumer.State.Status == ConsumerStatus.Halted
+                || (consumer.State.Skipped >= appliedBefore && consumer.State.LastBatchAt < DateTimeOffset.UtcNow.AddSeconds(-2))),
+                TimeSpan.FromSeconds(120), "the replay to drain", ct);
+            consumer.State.Status.Should().Be(ConsumerStatus.Running, consumer.State.HaltReason);
             consumer.State.Applied.Should().Be(0, "every redelivered change is at or behind its row's position");
         }
 

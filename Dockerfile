@@ -13,9 +13,11 @@ RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
 
 COPY .editorconfig ./
 COPY src/ src/
+# No --no-restore: with registry/GHA layer caching the restore layer can be a cache hit while the NuGet cache mount
+# is empty, and publish would then find no packages. A second restore against a warm mount costs about a second.
 RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
     dotnet publish src/CdcPipeline.Consumer/CdcPipeline.Consumer.csproj \
-        --configuration Release --no-restore --output /app/publish -p:UseAppHost=false
+        --configuration Release --output /app/publish -p:UseAppHost=false
 
 # ---- runtime -----------------------------------------------------------------------------------------
 # Chiseled Ubuntu: no shell, no package manager, and a non-root "app" user (UID 1654) baked in.

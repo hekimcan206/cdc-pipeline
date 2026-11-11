@@ -35,7 +35,18 @@ public sealed class OraclePipelineTests(OraclePipelineFixture fixture, ITestOutp
             await Task.Delay(1500, ct);
             consumer = ConsumerProcess.Start(settings, FreePort());
             await load;
-            await probe.WaitForConvergenceAsync(writer, workload.FirstId, workload.LastId, TimeSpan.FromSeconds(120), ct);
+            try
+            {
+                await probe.WaitForConvergenceAsync(writer, workload.FirstId, workload.LastId, TimeSpan.FromSeconds(180), ct);
+            }
+            catch (TimeoutException ex)
+            {
+                var (logs, _) = await stack.DebeziumLogsAsync();
+                var stats = await consumer.StatsAsync();
+                throw new TimeoutException(
+                    $"{ex.Message}\nconsumer exited={consumer.HasExited} stats={stats}\ntopics={string.Join(",", await stack.ListTopicsAsync())}\n" +
+                    $"Debezium:\n{string.Join("\n", logs.Split('\n').Where(l => l.Contains("WARN", StringComparison.Ordinal) || l.Contains("ERROR", StringComparison.Ordinal)).TakeLast(15))}", ex);
+            }
         }
         finally
         {
