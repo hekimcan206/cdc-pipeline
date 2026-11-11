@@ -1,0 +1,6 @@
+# Cluster properties applied on the first start of the single Redpanda node.
+# Debezium topics are auto-created by the first produce; three partitions let per-key ordering be demonstrated
+# (records with the same primary key always hash to the same partition) without a separate topic-creation step.
+auto_create_topics_enabled: true
+default_topic_partitions: 3
+default_topic_replications: 1
