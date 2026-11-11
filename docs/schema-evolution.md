@@ -150,6 +150,26 @@ string `"1.500"` after it (and `"2.000"` for whole values).
 Widening is harmless until a value actually needs the new range; then a v1 consumer halts instead of truncating 1.5 to
 1 or 2. The read-model column is `numeric(14,3)` from the start, so v2 needed no migration.
 
+#### Pitfall found while building this: the connector must have caught up before `ALTER COLUMN ... TYPE`
+
+The first version of the integration test ran the three DDL statements straight after the inserts, while Debezium was
+still decoding them. The PostgreSQL connector (3.7.1) then stopped for good:
+
+```
+WARN  TableSchemaBuilder  Failed to properly convert data value for 'public.order_lines.quantity' of type numeric:
+      java.lang.IllegalArgumentException: Unexpected value for JDBC type 4 ...
+ERROR ErrorHandler        Producer failure: ... Error while processing event at offset {transaction_id=751, ...}
+ERROR DefaultDebeziumServerLifecycle  Debezium engine completed with a failure
+```
+
+pgoutput decodes old WAL with the catalog of its time (the order line still holds an `integer`), but the connector
+refreshes its table schema from the *current* catalog (`numeric`) and cannot convert the old value. No event was
+published past that point, so nothing was lost or corrupted downstream; the pipeline simply stopped and the consumer
+stayed `running` with nothing to read. Whether a plain restart recovers was not tested here. The rule the test now
+follows, and the one to follow in production: **let the connector catch up on a table before changing a column type on
+it** (pause writers or wait until the change before the DDL is visible downstream). Adding and renaming columns did not
+need this; the rename only produced `Column 'email' optionality could not be determined, defaulting to true`.
+
 ### Oracle: expand/contract
 
 Oracle refuses an in-place scale change on a non-empty column:
@@ -179,6 +199,8 @@ Run the two statements back to back with no DML in between (the test does), or g
    produce values the old type cannot hold).
 2. Additive: change the source; release a contract version later if the field should become typed.
 3. Breaking: release the consumer whose contract accepts both shapes **first**; then change the source.
+   For a type change on PostgreSQL, make sure Debezium has caught up on that table before the `ALTER` (see the pitfall
+   above); otherwise the connector stops.
 4. Watch `cdc.halts` and `/health/ready`. A halt names the event (`topic[partition]@offset`) and the field. Fix the
    contract, redeploy, and the consumer resumes from that exact event.
 5. Remove aliases only after the topic retention has passed since the change.
