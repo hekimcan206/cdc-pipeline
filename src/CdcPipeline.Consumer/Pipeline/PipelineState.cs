@@ -27,6 +27,11 @@ public sealed class PipelineState
 
     public DateTimeOffset? LastBatchAt { get; private set; }
 
+    /// <summary>Partitions currently assigned to this consumer by the group coordinator.</summary>
+    public int AssignedPartitions { get; private set; }
+
+    public void SetAssignedPartitions(int count) => AssignedPartitions = count;
+
     public long Applied => Interlocked.Read(ref _applied);
 
     public long Skipped => Interlocked.Read(ref _skipped);

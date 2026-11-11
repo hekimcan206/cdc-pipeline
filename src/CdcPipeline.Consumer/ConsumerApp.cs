@@ -60,6 +60,7 @@ public static class ConsumerApp
             skipped = state.Skipped,
             unmapped = state.Unmapped,
             batches = state.Batches,
+            assignedPartitions = state.AssignedPartitions,
             indexed = state.Indexed,
             forcedIndexed = state.ForcedIndexed,
             lastBatchAt = state.LastBatchAt,

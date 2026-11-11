@@ -48,6 +48,12 @@ internal sealed partial class ChangeConsumer(
 
         using var consumer = new ConsumerBuilder<byte[]?, byte[]?>(config)
             .SetErrorHandler((_, error) => LogBrokerError(error.Code, error.Reason, error.IsFatal))
+            .SetPartitionsAssignedHandler((_, partitions) =>
+            {
+                state.SetAssignedPartitions(partitions.Count);
+                LogAssigned(partitions.Count);
+            })
+            .SetPartitionsRevokedHandler((_, _) => state.SetAssignedPartitions(0))
             .Build();
         consumer.Subscribe(_options.TopicPattern);
         state.MarkRunning();
@@ -208,6 +214,9 @@ internal sealed partial class ChangeConsumer(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Consuming {Pattern} as group {GroupId} with {Entities} entity projections")]
     private partial void LogStarted(string pattern, string groupId, int entities);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Assigned {Count} partitions")]
+    private partial void LogAssigned(int count);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Broker error {Code}: {Reason} (fatal: {Fatal})")]
     private partial void LogBrokerError(ErrorCode code, string reason, bool fatal);

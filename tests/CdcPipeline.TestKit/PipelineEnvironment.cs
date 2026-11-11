@@ -243,6 +243,17 @@ public sealed class PipelineEnvironment : IAsyncDisposable
         await _debezium.StartAsync(ct);
     }
 
+    /// <summary>Topics on the broker with their total record count (sum of high watermarks).</summary>
+    public Task<IReadOnlyList<string>> ListTopicsAsync() => Task.Run<IReadOnlyList<string>>(() =>
+    {
+        using var admin = new Confluent.Kafka.AdminClientBuilder(new Confluent.Kafka.AdminClientConfig { BootstrapServers = KafkaBootstrap }).Build();
+        using var consumer = new Confluent.Kafka.ConsumerBuilder<Confluent.Kafka.Ignore, Confluent.Kafka.Ignore>(
+            new Confluent.Kafka.ConsumerConfig { BootstrapServers = KafkaBootstrap, GroupId = "diagnostics" }).Build();
+        return [.. admin.GetMetadata(TimeSpan.FromSeconds(10)).Topics
+            .Where(t => !t.Topic.StartsWith('_'))
+            .Select(t => $"{t.Topic}:{t.Partitions.Sum(p => consumer.QueryWatermarkOffsets(new Confluent.Kafka.TopicPartition(t.Topic, p.PartitionId), TimeSpan.FromSeconds(5)).High.Value)}")];
+    });
+
     public MeiliClient CreateMeiliClient()
     {
         var http = new HttpClient();

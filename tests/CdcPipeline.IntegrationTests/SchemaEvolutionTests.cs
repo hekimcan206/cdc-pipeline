@@ -48,13 +48,26 @@ public sealed class SchemaEvolutionTests(PostgresPipelineFixture fixture)
             await writer.InsertCustomerAsync(id, "Mert Kaya", "mert@example.test", "Bursa", ct);
             await writer.InsertOrderAsync(id, id, lines: 1, ct);
 
+            // Every DDL step waits until the changes before it have been captured (seen in the read model). A type
+            // change made while Debezium still has older rows of that table to decode stops the PostgreSQL connector
+            // ("Unexpected value for JDBC type 4": it refreshes the table schema from the current catalog and then
+            // meets an old integer value). See docs/schema-evolution.md, "Rollout checklist".
+            async Task CapturedAsync(string sql, string expected, string what) =>
+                await Waiter.UntilAsync(async () => await v2Probe.ScalarAsync<string>(sql, ct) == expected, TimeSpan.FromSeconds(60), what, ct);
+
+            await CapturedAsync($"SELECT quantity::int::text FROM rm_order_line WHERE order_id = {id}", "1", "the order to be captured");
+
             // 1. Add a column the contract knows (typed) and one it does not (lands in extra).
             await writer.ExecuteDdlAsync("ALTER TABLE customers ADD COLUMN loyalty_tier text, ADD COLUMN nickname text", ct);
             await writer.ExecuteAsync($"UPDATE customers SET loyalty_tier = 'GOLD', nickname = 'mk', version = version + 1, updated_at = clock_timestamp() WHERE id = {id}", ct);
 
+            await CapturedAsync($"SELECT loyalty_tier FROM rm_customer WHERE id = {id}", "GOLD", "the added column to be captured");
+
             // 2. Rename a required column.
             await writer.ExecuteDdlAsync("ALTER TABLE customers RENAME COLUMN email TO email_address", ct);
             await writer.ExecuteAsync($"UPDATE customers SET email_address = 'mert.kaya@example.test', version = version + 1, updated_at = clock_timestamp() WHERE id = {id}", ct);
+
+            await CapturedAsync($"SELECT email FROM rm_customer WHERE id = {id}", "mert.kaya@example.test", "the rename to be captured");
 
             // 3. Change a type: integer quantity becomes numeric(12,3) (sold by weight).
             await writer.ExecuteDdlAsync("ALTER TABLE order_lines ALTER COLUMN quantity TYPE numeric(12,3)", ct);
@@ -70,7 +83,7 @@ public sealed class SchemaEvolutionTests(PostgresPipelineFixture fixture)
                 var (stdout, _) = await stack.DebeziumLogsAsync();
                 var debeziumProblems = string.Join("\n", stdout.Split('\n').Where(l => l.Contains(" WARN ", StringComparison.Ordinal) || l.Contains("ERROR", StringComparison.Ordinal)).TakeLast(15));
                 throw new TimeoutException(
-                    $"{ex.Message} consumer={v2.State.Status} halt={v2.State.HaltReason} at={v2.State.HaltedAt} applied={v2.State.Applied} " +
+                    $"{ex.Message} consumer={v2.State.Status} assigned={v2.State.AssignedPartitions} topics=[{string.Join(",", await stack.ListTopicsAsync())}] halt={v2.State.HaltReason} at={v2.State.HaltedAt} applied={v2.State.Applied} " +
                     $"quantity={await v2Probe.ScalarAsync<string>($"SELECT quantity::text FROM rm_order_line WHERE order_id = {id}", ct)} " +
                     $"customerVersion={await v2Probe.ScalarAsync<int?>($"SELECT version FROM rm_customer WHERE id = {id}", ct)}\nDebezium:\n{debeziumProblems}", ex);
             }
