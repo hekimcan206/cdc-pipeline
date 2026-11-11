@@ -32,7 +32,8 @@ All notable changes to this project are documented here. The format follows
 - The PostgreSQL connector stops when `ALTER COLUMN ... TYPE` overtakes it; the evolution test and the rollout guide
   now let it catch up first.
 - The crash test killed the consumer so often (every 4th batch) that consumer-group rejoins, not correctness, decided
-  whether it converged in time; it now kills every 12th batch, and the session timeout is 6 s. As hardening, the source
+  whether it converged in time; it now kills every 10th batch of 50 and uses static group membership (new optional
+  `Consumer:GroupInstanceId`), so a restarted consumer takes its partitions back at once. As hardening, the source
   runs with `wal_sender_timeout=10s` and the connector retries its replication slot for up to 60 s.
 
 [Unreleased]: https://github.com/hekimcan206/cdc-pipeline/compare/v1.0.0...HEAD

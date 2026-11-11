@@ -96,6 +96,7 @@ services:
     image: cdc-pipeline-consumer:local
     environment:
       Consumer__KafkaBootstrap: redpanda:9092
+      Consumer__GroupInstanceId: consumer-1
       Consumer__ReadModelConnectionString: Host=readmodel-pg;Database=readmodel;Username=postgres;Password=${READMODEL_PASSWORD:-readmodel-dev-only}
       Consumer__Search__Url: http://meilisearch:7700
       Consumer__Search__ApiKey: ${MEILI_MASTER_KEY:-meili-master-key-dev-only-0123456789}

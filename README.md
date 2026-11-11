@@ -150,7 +150,7 @@ DB clock), same VM kernel clock. Method, environment and raw JSON: [docs/benchma
 | PostgreSQL, 30 s at 300 ops/s | 12,476 events | 9.56 s | 10.46 s | 1,305 events/s |
 | Oracle, 30 s at 150 ops/s | 6,301 events | 6.74 s | 7.71 s | 934 events/s |
 
-Crash test: consumer killed between read-model commit and offset commit every 4th batch plus random external kills,
+Crash test: consumer killed between read-model commit and offset commit every 10th batch of 50 plus random external kills,
 Debezium killed once mid-run, 1,500 operations: read model equal to the source, every row applied exactly `version`
 times, index holding exactly the live rows. Memory after the PostgreSQL run: Debezium 386 MiB, Redpanda 126 MiB,
 Meilisearch 94 MiB, read model 91 MiB; the Oracle database alone 3,005 MiB.
