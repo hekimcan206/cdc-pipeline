@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <Description>Shared by the integration tests and the benchmark harness: the containerised pipeline (source database,
+      Redpanda, Debezium Server, read-model PostgreSQL, Meilisearch), consumer hosts and a synthetic shop workload.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Testcontainers" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.Oracle" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CdcPipeline.Consumer\CdcPipeline.Consumer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The same init scripts and Debezium configs docker compose uses. -->
+    <None Include="..\..\deploy\**\*" Link="deploy\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

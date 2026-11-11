@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CdcPipeline.TestKit\CdcPipeline.TestKit.csproj" />
+    <ProjectReference Include="..\..\src\CdcPipeline.Consumer\CdcPipeline.Consumer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test classes run one after another: each pipeline stack takes ~1.3 GB of a shared Docker VM, and several
+         tests measure timing. -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CdcPipeline.UnitTests\Fixtures\**\*.jsonl" Link="Fixtures\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+  </ItemGroup>
+
+</Project>
