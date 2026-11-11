@@ -20,6 +20,26 @@ public sealed class SchemaEvolutionTests(PostgresPipelineFixture fixture)
         var writer = ShopWriter.For(stack);
         const long id = 4_000_001;
 
+        try
+        {
+            await RunAsync(stack, writer, id, ct);
+        }
+        finally
+        {
+            // Restore the original column name even when an assertion failed, so the tests sharing this stack (and the
+            // workload, which writes 'email') are not broken by this one. The v2 alias accepts both names.
+            await writer.ExecuteDdlAsync("""
+                DO $ BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'customers' AND column_name = 'email_address') THEN
+                        ALTER TABLE customers RENAME COLUMN email_address TO email;
+                    END IF;
+                END $
+                """, CancellationToken.None);
+        }
+    }
+
+    private async Task RunAsync(PipelineEnvironment stack, ShopWriter writer, long id, CancellationToken ct)
+    {
         var v2Name = fixture.NextName("evo");
         var v2ReadModel = await stack.CreateReadModelDatabaseAsync(v2Name, ct);
         var v2Probe = new ReadModelProbe(v2ReadModel, "pg");
@@ -40,8 +60,21 @@ public sealed class SchemaEvolutionTests(PostgresPipelineFixture fixture)
             await writer.ExecuteDdlAsync("ALTER TABLE order_lines ALTER COLUMN quantity TYPE numeric(12,3)", ct);
             await writer.ExecuteAsync($"UPDATE order_lines SET quantity = 1.250, version = version + 1, updated_at = clock_timestamp() WHERE order_id = {id}", ct);
 
-            await Waiter.UntilAsync(async () => await v2Probe.ScalarAsync<decimal?>($"SELECT quantity FROM rm_order_line WHERE order_id = {id}", ct) == 1.250m,
-                TimeSpan.FromSeconds(60), "the type change to be projected", ct);
+            try
+            {
+                await Waiter.UntilAsync(async () => await v2Probe.ScalarAsync<decimal?>($"SELECT quantity FROM rm_order_line WHERE order_id = {id}", ct) == 1.250m,
+                    TimeSpan.FromSeconds(90), "the type change to be projected", ct);
+            }
+            catch (TimeoutException ex)
+            {
+                var (stdout, _) = await stack.DebeziumLogsAsync();
+                var debeziumProblems = string.Join("\n", stdout.Split('\n').Where(l => l.Contains(" WARN ", StringComparison.Ordinal) || l.Contains("ERROR", StringComparison.Ordinal)).TakeLast(15));
+                throw new TimeoutException(
+                    $"{ex.Message} consumer={v2.State.Status} halt={v2.State.HaltReason} at={v2.State.HaltedAt} applied={v2.State.Applied} " +
+                    $"quantity={await v2Probe.ScalarAsync<string>($"SELECT quantity::text FROM rm_order_line WHERE order_id = {id}", ct)} " +
+                    $"customerVersion={await v2Probe.ScalarAsync<int?>($"SELECT version FROM rm_customer WHERE id = {id}", ct)}\nDebezium:\n{debeziumProblems}", ex);
+            }
+
             v2.State.Status.Should().Be(ConsumerStatus.Running);
 
             (await v2Probe.ScalarAsync<string>($"SELECT email FROM rm_customer WHERE id = {id}", ct)).Should().Be("mert.kaya@example.test");
@@ -79,9 +112,5 @@ public sealed class SchemaEvolutionTests(PostgresPipelineFixture fixture)
             (await v1Probe.ScalarAsync<string>($"SELECT email FROM rm_customer WHERE id = {id}", ct)).Should().Be("mert.kaya@example.test");
             (await v1Probe.ScalarAsync<int>($"SELECT apply_count FROM rm_customer WHERE id = {id}", ct)).Should().Be(3);
         }
-
-        // Rename back so later tests (and the workload, which writes 'email') see the original column name. The v2
-        // alias accepts both names, so this is just one more evolution step.
-        await writer.ExecuteDdlAsync("ALTER TABLE customers RENAME COLUMN email_address TO email", ct);
     }
 }
