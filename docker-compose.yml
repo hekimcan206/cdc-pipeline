@@ -15,7 +15,7 @@ x-dev-secrets: &dev-secrets
 services:
   source-pg:
     image: postgres:17-alpine
-    command: ["postgres", "-c", "wal_level=logical", "-c", "max_wal_senders=4", "-c", "max_replication_slots=4"]
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_wal_senders=4", "-c", "max_replication_slots=4", "-c", "wal_sender_timeout=10s"]
     environment:
       <<: *dev-secrets
       POSTGRES_DB: shop

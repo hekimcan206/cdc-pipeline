@@ -40,7 +40,7 @@ internal sealed partial class ChangeConsumer(
             AutoOffsetReset = AutoOffsetReset.Earliest,
             // Regex subscriptions only see topics after a metadata refresh; Debezium creates topics lazily.
             TopicMetadataRefreshIntervalMs = 2000,
-            SessionTimeoutMs = 10_000,
+            SessionTimeoutMs = 6_000,
             HeartbeatIntervalMs = 2_000,
             MaxPollIntervalMs = 300_000,
             ClientId = $"cdc-consumer-{Environment.MachineName}",
