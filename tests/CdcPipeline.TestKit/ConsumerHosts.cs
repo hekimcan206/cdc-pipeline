@@ -117,9 +117,24 @@ public sealed class ConsumerProcess : IDisposable
         info.Environment["ASPNETCORE_URLS"] = $"http://127.0.0.1:{port}";
         info.Environment["DOTNET_ENVIRONMENT"] = "Production";
         var process = Process.Start(info)!;
-        // Drain the pipes so a chatty child never blocks on a full buffer.
-        process.OutputDataReceived += (_, _) => { };
-        process.ErrorDataReceived += (_, _) => { };
+        // Drain the pipes (a full buffer would block the child) into a log file; CDC_CONSUMER_LOG overrides the path.
+        var log = Environment.GetEnvironmentVariable("CDC_CONSUMER_LOG") ?? Path.Combine(Path.GetTempPath(), "cdc-pipeline-consumer.log");
+        var gate = new object();
+        void Append(string? line)
+        {
+            if (line is null)
+            {
+                return;
+            }
+
+            lock (gate)
+            {
+                File.AppendAllText(log, line + Environment.NewLine);
+            }
+        }
+
+        process.OutputDataReceived += (_, e) => Append(e.Data);
+        process.ErrorDataReceived += (_, e) => Append(e.Data);
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
         return new ConsumerProcess(process, port);

@@ -49,8 +49,8 @@ public sealed class PostgresPipelineFixture : IAsyncLifetime
 }
 
 /// <summary>
-/// The Oracle LogMiner pipeline. Started only when <c>CDC_ORACLE_TESTS=1</c>: Oracle Database Free alone needs about
-/// 2.3 GB, so it is opt-in locally and runs in its own CI job.
+/// The Oracle LogMiner pipeline. Started only when <c>CDC_ORACLE_TESTS=1</c>: Oracle Database Free alone needs 2.3-3 GB
+/// (measured), so it is opt-in locally and runs in its own CI job.
 /// </summary>
 public sealed class OraclePipelineFixture : IAsyncLifetime
 {

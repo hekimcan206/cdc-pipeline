@@ -41,6 +41,11 @@ public sealed class SchemaEvolutionTests(PostgresPipelineFixture fixture)
     private async Task RunAsync(PipelineEnvironment stack, ShopWriter writer, long id, CancellationToken ct)
     {
         var v2Name = fixture.NextName("evo");
+        var v1Name = fixture.NextName("evo-v1-");
+
+        // Both groups start at the current end of the shared topics: only this test's changes are replayed.
+        await stack.PositionGroupAtEndAsync($"group-{v2Name}");
+        await stack.PositionGroupAtEndAsync($"group-{v1Name}");
         var v2ReadModel = await stack.CreateReadModelDatabaseAsync(v2Name, ct);
         var v2Probe = new ReadModelProbe(v2ReadModel, "pg");
         await using (var v2 = await ConsumerInstance.StartAsync(ConsumerSettings.For(stack, v2ReadModel, v2Name)))
@@ -103,7 +108,6 @@ public sealed class SchemaEvolutionTests(PostgresPipelineFixture fixture)
 
         // A consumer still on contract v1 replays the same history: it halts at the first evolved event it cannot map, commits
         // nothing past it, and reports where it stopped.
-        var v1Name = fixture.NextName("evo-v1-");
         var v1ReadModel = await stack.CreateReadModelDatabaseAsync(v1Name, ct);
         var v1Settings = ConsumerSettings.For(stack, v1ReadModel, v1Name) with { ContractVersion = "v1" };
         await using (var v1 = await ConsumerInstance.StartAsync(v1Settings))

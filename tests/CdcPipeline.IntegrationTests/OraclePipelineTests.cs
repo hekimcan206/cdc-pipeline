@@ -7,7 +7,7 @@ namespace CdcPipeline.IntegrationTests;
 
 /// <summary>
 /// Oracle Database 23ai Free → Debezium LogMiner → Redpanda → consumer. Opt-in (<c>CDC_ORACLE_TESTS=1</c>): the
-/// stack needs about 3.5 GB. Covers a mixed workload across a hard consumer kill, and Oracle's version of the schema
+/// stack needs about 3.8 GB. Covers a mixed workload across a hard consumer kill, and Oracle's version of the schema
 /// changes, including the expand/contract migration Oracle needs for a scale change on a non-empty NUMBER column.
 /// </summary>
 [Collection(OraclePipelineGroup.Name)]
@@ -16,7 +16,7 @@ public sealed class OraclePipelineTests(OraclePipelineFixture fixture, ITestOutp
     [Fact]
     public async Task LogMiner_changes_survive_a_consumer_kill_and_schema_evolution()
     {
-        Assert.SkipUnless(OraclePipelineFixture.Enabled, "Set CDC_ORACLE_TESTS=1 to run the Oracle LogMiner pipeline (about 3.5 GB of Docker memory).");
+        Assert.SkipUnless(OraclePipelineFixture.Enabled, "Set CDC_ORACLE_TESTS=1 to run the Oracle LogMiner pipeline (about 3.8 GB of Docker memory).");
         var ct = TestContext.Current.CancellationToken;
         var stack = fixture.Stack!;
         var readModel = await stack.CreateReadModelDatabaseAsync("ora_e2e", ct);

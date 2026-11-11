@@ -158,7 +158,7 @@ public sealed class PipelineEnvironment : IAsyncDisposable
             .WithEnvironment("DBZ_PASSWORD", DebeziumPassword)
             .WithResourceMapping(File.ReadAllBytes(DeployPath("postgres-source", "01-shop.sh")), "/docker-entrypoint-initdb.d/01-shop.sh",
                 fileMode: UnixFileModes.UserRead | UnixFileModes.UserExecute | UnixFileModes.GroupRead | UnixFileModes.OtherRead)
-            .WithCommand("-c", "wal_level=logical", "-c", "max_wal_senders=4", "-c", "max_replication_slots=4")
+            .WithCommand("-c", "wal_level=logical", "-c", "max_wal_senders=4", "-c", "max_replication_slots=4", "-c", "wal_sender_timeout=10s")
             .WithLabel("project", "cdc-pipeline-tests")
             .Build();
         return _sourcePg;
@@ -252,6 +252,26 @@ public sealed class PipelineEnvironment : IAsyncDisposable
         return [.. admin.GetMetadata(TimeSpan.FromSeconds(10)).Topics
             .Where(t => !t.Topic.StartsWith('_'))
             .Select(t => $"{t.Topic}:{t.Partitions.Sum(p => consumer.QueryWatermarkOffsets(new Confluent.Kafka.TopicPartition(t.Topic, p.PartitionId), TimeSpan.FromSeconds(5)).High.Value)}")];
+    });
+
+    /// <summary>
+    /// Commits the current end of every pipeline topic for <paramref name="groupId"/>, so a consumer in that group starts
+    /// with what is written from now on instead of the history earlier tests left in the shared broker.
+    /// </summary>
+    public Task PositionGroupAtEndAsync(string groupId) => Task.Run(() =>
+    {
+        using var admin = new Confluent.Kafka.AdminClientBuilder(new Confluent.Kafka.AdminClientConfig { BootstrapServers = KafkaBootstrap }).Build();
+        using var consumer = new Confluent.Kafka.ConsumerBuilder<Confluent.Kafka.Ignore, Confluent.Kafka.Ignore>(
+            new Confluent.Kafka.ConsumerConfig { BootstrapServers = KafkaBootstrap, GroupId = groupId, EnableAutoCommit = false }).Build();
+        var ends = admin.GetMetadata(TimeSpan.FromSeconds(10)).Topics
+            .Where(t => t.Topic.StartsWith(SourceName + ".", StringComparison.Ordinal))
+            .SelectMany(t => t.Partitions.Select(p => new Confluent.Kafka.TopicPartition(t.Topic, p.PartitionId)))
+            .Select(tp => new Confluent.Kafka.TopicPartitionOffset(tp, consumer.QueryWatermarkOffsets(tp, TimeSpan.FromSeconds(5)).High))
+            .ToList();
+        if (ends.Count > 0)
+        {
+            consumer.Commit(ends);
+        }
     });
 
     public MeiliClient CreateMeiliClient()
