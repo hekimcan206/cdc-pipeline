@@ -1,0 +1,157 @@
+# docker compose up
+#   PostgreSQL source -> Debezium Server -> Redpanda -> .NET consumer -> read model (PostgreSQL) + Meilisearch,
+#   then a scripted demo (insert, multi-row transaction, update, delete, ADD COLUMN) asserts the result in the read
+#   model and the search index and prints a JSON summary (docker compose logs demo).
+#
+# docker compose --profile oracle up -d oracle debezium-oracle
+#   adds the Oracle 23ai Free LogMiner pipeline (about 3 GB more); the running consumer picks up its topics.
+#
+# Host ports are deliberately unusual to avoid clashing with other local projects.
+
+x-dev-secrets: &dev-secrets
+  SHOP_APP_PASSWORD: ${SHOP_APP_PASSWORD:-shop-app-dev-only}
+  DBZ_PASSWORD: ${DBZ_PASSWORD:-debezium-dev-only}
+
+services:
+  source-pg:
+    image: postgres:17-alpine
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_wal_senders=4", "-c", "max_replication_slots=4"]
+    environment:
+      <<: *dev-secrets
+      POSTGRES_DB: shop
+      POSTGRES_PASSWORD: ${SOURCE_PG_PASSWORD:-source-admin-dev-only}
+    volumes:
+      - ./deploy/postgres-source:/docker-entrypoint-initdb.d:ro
+    ports: ["56432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U postgres -d shop -tAc \"SELECT 1 FROM pg_publication WHERE pubname = 'cdc_shop'\" | grep -q 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  redpanda:
+    image: redpandadata/redpanda:v26.2.6
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:59092
+    volumes:
+      - ./deploy/redpanda/bootstrap.yaml:/etc/redpanda/.bootstrap.yaml:ro
+    ports: ["59092:19092"]
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true'"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  debezium:
+    image: quay.io/debezium/server:3.7.1.Final
+    environment:
+      <<: *dev-secrets
+      JAVA_OPTS: -Xms64m -Xmx256m
+      KAFKA_BOOTSTRAP: redpanda:9092
+      PG_SOURCE_HOST: source-pg
+    volumes:
+      - ./deploy/debezium/postgres.properties:/debezium/config/application.properties:ro
+      - debezium-pg-data:/debezium/data
+    mem_limit: 768m
+    depends_on:
+      source-pg: { condition: service_healthy }
+      redpanda: { condition: service_healthy }
+
+  readmodel-pg:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: readmodel
+      POSTGRES_PASSWORD: ${READMODEL_PASSWORD:-readmodel-dev-only}
+    ports: ["56433:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d readmodel"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.56.2
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-meili-master-key-dev-only-0123456789}
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_ENV: development
+    ports: ["57700:7700"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:7700/health || wget -qO- http://127.0.0.1:7700/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  consumer:
+    build: .
+    image: cdc-pipeline-consumer:local
+    environment:
+      Consumer__KafkaBootstrap: redpanda:9092
+      Consumer__ReadModelConnectionString: Host=readmodel-pg;Database=readmodel;Username=postgres;Password=${READMODEL_PASSWORD:-readmodel-dev-only}
+      Consumer__Search__Url: http://meilisearch:7700
+      Consumer__Search__ApiKey: ${MEILI_MASTER_KEY:-meili-master-key-dev-only-0123456789}
+    ports: ["58080:8080"]
+    depends_on:
+      redpanda: { condition: service_healthy }
+      readmodel-pg: { condition: service_healthy }
+      meilisearch: { condition: service_healthy }
+
+  demo:
+    image: postgres:17-alpine
+    entrypoint: ["/bin/sh", "/demo/demo.sh"]
+    environment:
+      <<: *dev-secrets
+      SOURCE_ADMIN_PASSWORD: ${SOURCE_PG_PASSWORD:-source-admin-dev-only}
+      READMODEL_PASSWORD: ${READMODEL_PASSWORD:-readmodel-dev-only}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-meili-master-key-dev-only-0123456789}
+    volumes:
+      - ./deploy/demo:/demo:ro
+    depends_on:
+      consumer: { condition: service_started }
+      debezium: { condition: service_started }
+
+  oracle:
+    profiles: [oracle]
+    image: gvenzl/oracle-free:23-slim-faststart
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-OracleDevOnly1}
+      DBZ_PASSWORD: ${DBZ_PASSWORD:-debezium-dev-only}
+      SHOP_PASSWORD: ${ORACLE_SHOP_PASSWORD:-ShopDevOnly1}
+    volumes:
+      - ./deploy/oracle/init:/container-entrypoint-initdb.d:ro
+    ports: ["51521:1521"]
+    mem_limit: 2560m
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 60
+
+  debezium-oracle:
+    profiles: [oracle]
+    image: quay.io/debezium/server:3.7.1.Final
+    environment:
+      DBZ_PASSWORD: ${DBZ_PASSWORD:-debezium-dev-only}
+      JAVA_OPTS: -Xms64m -Xmx384m
+      KAFKA_BOOTSTRAP: redpanda:9092
+      ORACLE_HOST: oracle
+    volumes:
+      - ./deploy/debezium/oracle.properties:/debezium/config/application.properties:ro
+      - debezium-ora-data:/debezium/data
+    mem_limit: 768m
+    depends_on:
+      oracle: { condition: service_healthy }
+      redpanda: { condition: service_healthy }
+
+volumes:
+  debezium-pg-data:
+  debezium-ora-data:

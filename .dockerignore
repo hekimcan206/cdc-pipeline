@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+**/TestResults/
+**/node_modules/
+**/__pycache__/
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+docs/
+tests/
+benchmarks/
+benchmark-results/
+*.md
+.env
+docker-compose*.yml
