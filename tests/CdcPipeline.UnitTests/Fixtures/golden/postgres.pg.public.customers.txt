@@ -1,0 +1,4 @@
+pg customers Read key={id=1} pos=0/26728096 tx=-#- ts=2026-11-11T19:12:48.0507860+00:00 image={city="Ankara",email="ayse@example.test",full_name="Ayse Yilmaz",id=1,updated_at="2026-11-11T19:12:28.966093Z",version=1}
+pg customers Update key={id=1} pos=26728944/26728944 tx=763#1 ts=2026-11-11T19:13:01.3302400+00:00 image={city="Izmir",email="ayse@example.test",full_name="Ayse Yilmaz",id=1,updated_at="2026-11-11T19:13:01.330208Z",version=2}
+pg customers Update key={id=1} pos=26729240/26746008 tx=766#1 ts=2026-11-11T19:13:02.4354420+00:00 image={city="Izmir",email="ayse@example.test",full_name="Ayse Yilmaz",id=1,loyalty_tier="GOLD",updated_at="2026-11-11T19:13:02.435411Z",version=3}
+pg customers Update key={id=1} pos=26746184/26910360 tx=769#1 ts=2026-11-11T19:13:03.9674000+00:00 image={city="Izmir",email_address="ayse.y@example.test",full_name="Ayse Yilmaz",id=1,loyalty_tier="GOLD",updated_at="2026-11-11T19:13:03.967365Z",version=4}

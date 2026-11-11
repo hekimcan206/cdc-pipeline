@@ -1,0 +1,1 @@
+pg orders Create key={id=10} pos=1/26728192 tx=762#1 ts=2026-11-11T19:13:01.3250960+00:00 image={customer_id=1,id=10,status="NEW",total_amount="12.50",updated_at="2026-11-11T19:13:01.324122Z",version=1}

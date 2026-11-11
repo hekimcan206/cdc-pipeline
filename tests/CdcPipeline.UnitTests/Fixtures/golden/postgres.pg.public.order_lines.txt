@@ -1,0 +1,4 @@
+pg order_lines Create key={line_no=1,order_id=10} pos=1/26728448 tx=762#2 ts=2026-11-11T19:13:01.3250960+00:00 image={line_no=1,order_id=10,quantity=2,sku="SKU-1",unit_price="6.25",updated_at="2026-11-11T19:13:01.324777Z",version=1}
+pg order_lines Delete key={line_no=1,order_id=10} pos=26729120/26729120 tx=764#1 ts=2026-11-11T19:13:01.3331560+00:00 image={line_no=1,order_id=10,quantity=0,sku="",unit_price="0.00",updated_at="1970-01-01T00:00:00.000000Z",version=1}
+pg order_lines Create key={line_no=2,order_id=10} pos=1/26728720 tx=762#3 ts=2026-11-11T19:13:01.3250960+00:00 image={line_no=2,order_id=10,quantity=3,sku="SKU-2",unit_price="1.00",updated_at="2026-11-11T19:13:01.324981Z",version=1}
+pg order_lines Update key={line_no=2,order_id=10} pos=26910544/26910544 tx=770#1 ts=2026-11-11T19:13:03.9707290+00:00 image={line_no=2,order_id=10,quantity="1.500",sku="SKU-2",unit_price="1.00",updated_at="2026-11-11T19:13:03.970710Z",version=2}

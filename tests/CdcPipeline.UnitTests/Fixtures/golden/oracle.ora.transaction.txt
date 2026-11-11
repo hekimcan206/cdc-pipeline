@@ -1,0 +1,14 @@
+ora tx Begin id=05000d0063020000 events=-
+ora tx End id=05000d0063020000 events=1
+ora tx Begin id=080014005d020000 events=-
+ora tx End id=080014005d020000 events=1
+ora tx Begin id=02001000ba020000 events=-
+ora tx End id=02001000ba020000 events=1
+ora tx Begin id=0700090050020000 events=-
+ora tx End id=0700090050020000 events=1
+ora tx Begin id=0a00110052020000 events=-
+ora tx End id=0a00110052020000 events=2
+ora tx Begin id=02000400ba020000 events=-
+ora tx End id=02000400ba020000 events=1
+ora tx Begin id=03000b0057020000 events=-
+ora tx End id=03000b0057020000 events=1

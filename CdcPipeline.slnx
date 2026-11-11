@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/CdcPipeline.Core/CdcPipeline.Core.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CdcPipeline.UnitTests/CdcPipeline.UnitTests.csproj" />
+  </Folder>
 </Solution>

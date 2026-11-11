@@ -1,0 +1,12 @@
+{"topic":"pg.transaction","partition":2,"key":{"id":"766:26746008"},"value":{"status":"BEGIN","id":"766:26746008","event_count":null,"data_collections":null,"ts_ms":1794424382435}}
+{"topic":"pg.transaction","partition":2,"key":{"id":"766:26746184"},"value":{"status":"END","id":"766:26746184","event_count":1,"data_collections":[{"data_collection":"public.customers","event_count":1}],"ts_ms":1794424382435}}
+{"topic":"pg.transaction","partition":2,"key":{"id":"769:26910360"},"value":{"status":"BEGIN","id":"769:26910360","event_count":null,"data_collections":null,"ts_ms":1794424383967}}
+{"topic":"pg.transaction","partition":0,"key":{"id":"762:26728192"},"value":{"status":"BEGIN","id":"762:26728192","event_count":null,"data_collections":null,"ts_ms":1794424381325}}
+{"topic":"pg.transaction","partition":0,"key":{"id":"762:26728944"},"value":{"status":"END","id":"762:26728944","event_count":3,"data_collections":[{"data_collection":"public.orders","event_count":1},{"data_collection":"public.order_lines","event_count":2}],"ts_ms":1794424381325}}
+{"topic":"pg.transaction","partition":0,"key":{"id":"763:26729120"},"value":{"status":"END","id":"763:26729120","event_count":1,"data_collections":[{"data_collection":"public.customers","event_count":1}],"ts_ms":1794424381330}}
+{"topic":"pg.transaction","partition":0,"key":{"id":"769:26910544"},"value":{"status":"END","id":"769:26910544","event_count":1,"data_collections":[{"data_collection":"public.customers","event_count":1}],"ts_ms":1794424383967}}
+{"topic":"pg.transaction","partition":0,"key":{"id":"770:26910712"},"value":{"status":"END","id":"770:26910712","event_count":1,"data_collections":[{"data_collection":"public.order_lines","event_count":1}],"ts_ms":1794424383970}}
+{"topic":"pg.transaction","partition":1,"key":{"id":"763:26728944"},"value":{"status":"BEGIN","id":"763:26728944","event_count":null,"data_collections":null,"ts_ms":1794424381330}}
+{"topic":"pg.transaction","partition":1,"key":{"id":"764:26729120"},"value":{"status":"BEGIN","id":"764:26729120","event_count":null,"data_collections":null,"ts_ms":1794424381333}}
+{"topic":"pg.transaction","partition":1,"key":{"id":"764:26729240"},"value":{"status":"END","id":"764:26729240","event_count":1,"data_collections":[{"data_collection":"public.order_lines","event_count":1}],"ts_ms":1794424381333}}
+{"topic":"pg.transaction","partition":1,"key":{"id":"770:26910544"},"value":{"status":"BEGIN","id":"770:26910544","event_count":null,"data_collections":null,"ts_ms":1794424383970}}

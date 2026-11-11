@@ -1,0 +1,12 @@
+pg tx Begin id=766 events=-
+pg tx End id=766 events=1
+pg tx Begin id=769 events=-
+pg tx Begin id=762 events=-
+pg tx End id=762 events=3
+pg tx End id=763 events=1
+pg tx End id=769 events=1
+pg tx End id=770 events=1
+pg tx Begin id=763 events=-
+pg tx Begin id=764 events=-
+pg tx End id=764 events=1
+pg tx Begin id=770 events=-
