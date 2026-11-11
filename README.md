@@ -132,7 +132,28 @@ dotnet run -c Release --project benchmarks/CdcPipeline.Bench -- pg # or: oracle
 
 ## Results
 
-See [docs/benchmarks.md](docs/benchmarks.md) for method, environment and raw numbers.
+Measured on an i7-13620H laptop, Docker Desktop VM with 7.6 GB shared with another project; one run per row, Release
+build. Lag is per row from the source row's `updated_at` (source DB clock) to `applied_at` / `indexed_at` (read-model
+DB clock), same VM kernel clock. Method, environment and raw JSON: [docs/benchmarks.md](docs/benchmarks.md).
+
+| Source | Offered load | Commit → read model p50 / p95 / p99 | Commit → search index p50 / p95 / p99 |
+|---|---|---|---|
+| PostgreSQL | 50 ops/s (71 changes/s) | 255 / 455 / 557 ms | 356 / 573 / 679 ms |
+| PostgreSQL | 200 ops/s (281 changes/s) | 311 / 543 / 1,124 ms | 513 / 1,876 / 2,589 ms |
+| PostgreSQL | 500 ops/s (699 changes/s) | 277 / 409 / 517 ms | 733 / 1,100 / 1,281 ms |
+| Oracle | 25 ops/s (37 changes/s) | 2,004 / 3,705 / 3,864 ms | 2,231 / 3,884 / 4,004 ms |
+| Oracle | 100 ops/s (140 changes/s) | 2,221 / 3,584 / 3,941 ms | 2,595 / 3,864 / 4,247 ms |
+| Oracle | 200 ops/s (281 changes/s) | 2,421 / 3,651 / 3,999 ms | 2,835 / 4,026 / 4,359 ms |
+
+| Consumer downtime | Backlog | Read model caught up | Index caught up | Drain rate |
+|---|---|---|---|---|
+| PostgreSQL, 30 s at 300 ops/s | 12,476 events | 9.56 s | 10.46 s | 1,305 events/s |
+| Oracle, 30 s at 150 ops/s | 6,301 events | 6.74 s | 7.71 s | 934 events/s |
+
+Crash test: consumer killed between read-model commit and offset commit every 4th batch plus random external kills,
+Debezium killed once mid-run, 1,500 operations: read model equal to the source, every row applied exactly `version`
+times, index holding exactly the live rows. Memory after the PostgreSQL run: Debezium 386 MiB, Redpanda 126 MiB,
+Meilisearch 94 MiB, read model 91 MiB; the Oracle database alone 3,005 MiB.
 
 ## Limitations and next steps
 
@@ -146,6 +167,11 @@ See [docs/benchmarks.md](docs/benchmarks.md) for method, environment and raw num
   (debezium/dbz#2785); the demo schema uses heap tables and no savepoints. Online redo logs are 10 MB on the Free image;
   enlarge them for real load. In-place scale changes on non-empty NUMBER columns are refused by Oracle (expand/contract
   instead, documented).
+- **Consumer drain rate is about 1,300 events/s** (one guarded upsert per change, one round trip per batch). A
+  set-based upsert per batch (deduplicate per key, then one `INSERT ... SELECT FROM unnest(...)`) is the next step.
+- **LogMiner lag is about 2 s p50** with untuned mining settings and the Free image's 10 MB redo groups.
+- **Type changes on PostgreSQL need the connector caught up first**: Debezium 3.7.1 stopped when an `ALTER COLUMN
+  TYPE` overtook it (docs/schema-evolution.md).
 - **One consumer instance per group** is what is tested. Several instances work by the same argument (partitions are
   exclusive within a group and the guard absorbs rebalance redelivery) but are not exercised by the suite.
 - **Tombstones keep personal data** of deleted rows; a purge job for rows older than the replay window is described in

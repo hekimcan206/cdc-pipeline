@@ -35,7 +35,8 @@ another project on a Docker VM with about 7.6 GB of memory, and in GitHub Action
 ## Consequences
 
 - Measured on this machine (docs/benchmarks.md): Redpanda and Debezium Server stay well inside their 768 MB container
-  limits under the benchmark load; the PostgreSQL stack starts in about 25 s.
+  limits under the benchmark load (126 MiB and 386 MiB after the PostgreSQL run); the PostgreSQL stack is ready in
+  17-19 s, the Oracle stack in 85 s.
 - A single broker node has no replication: losing its volume loses the log. Acceptable for a demo and CI; production
   would run three nodes, `replication.factor=3` and `min.insync.replicas=2`. The consumer and the idempotent
   projection do not change.

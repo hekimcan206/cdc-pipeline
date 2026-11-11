@@ -45,9 +45,13 @@ was verified on the captured events in `tests/CdcPipeline.UnitTests/Fixtures/ora
 
 ## Consequences
 
-- Measured: the init script adds about 40 s to the first start (instance bounce plus user and schema creation); the
-  Oracle container uses about 2.3 GB at rest. With Debezium, Redpanda, the read model and Meilisearch, the Oracle
-  stack needs about 3.5 GB, so it never runs at the same time as the PostgreSQL stack in tests or benchmarks.
+- Measured: the whole Oracle stack (database start including this script, Debezium snapshot, broker, read model,
+  index) is ready in 85 s on this machine, against 17-19 s for the PostgreSQL stack; the script's own share was not
+  timed separately. The Oracle container used 2.29 GiB at rest under a 2.5 GB limit and 3,005 MiB without a limit after
+  the benchmark; the full Oracle stack used about 3.8 GB, so it never runs at the same time as the PostgreSQL stack in
+  tests or benchmarks.
+- LogMiner adds latency: commit-to-read-model p50 was 2.0-2.4 s at every load level tried (25-200 operations/s),
+  against 0.26-0.31 s for pgoutput. The connector mines in cycles; the mining sleep and batch settings were not tuned.
 - The slim image keeps LogMiner (the slim variant removes Text, Spatial, XDB-adjacent options and the installer, not
   LogMiner). Debezium logs online redo groups of 10 MB on this image; that means frequent log switches under load,
   which LogMiner handles but which is the first thing to enlarge outside a demo.

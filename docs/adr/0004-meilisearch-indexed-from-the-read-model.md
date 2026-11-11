@@ -15,7 +15,7 @@ should not show half of a source transaction.
 
 1. **OpenSearch 3.x.** Full Lucene feature set (aggregations, complex queries, analyzers), but a JVM: the project's own
    guidance is to give the heap half the container memory, and a single node is normally sized in gigabytes. On a
-   shared 7.6 GB VM that already holds a broker, Debezium and, in the Oracle stack, a 2.3 GB database, that is the
+   shared 7.6 GB VM that already holds a broker, Debezium and, in the Oracle stack, a 3 GB database, that is the
    budget of the whole pipeline.
 2. **Meilisearch v1.56** (chosen). A single Rust binary, memory-mapped storage, typo-tolerant full-text search with
    filters out of the box, a small REST API and asynchronous tasks with explicit status.

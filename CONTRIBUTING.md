@@ -5,7 +5,7 @@ Thanks for taking the time to improve cdc-pipeline.
 ## Prerequisites
 
 - .NET SDK 10.0.400 or later (`global.json` rolls forward to the latest feature band)
-- Docker with about 2 GB free for the PostgreSQL pipeline tests, about 3.5 GB for the Oracle ones
+- Docker with about 2 GB free for the PostgreSQL pipeline tests, about 3.8 GB for the Oracle ones
   (`CDC_ORACLE_TESTS=1`). The two pipelines never run at the same time.
 
 ## Workflow
