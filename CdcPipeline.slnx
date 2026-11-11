@@ -8,4 +8,7 @@
     <Project Path="tests/CdcPipeline.UnitTests/CdcPipeline.UnitTests.csproj" />
     <Project Path="tests/CdcPipeline.IntegrationTests/CdcPipeline.IntegrationTests.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/CdcPipeline.Bench/CdcPipeline.Bench.csproj" />
+  </Folder>
 </Solution>

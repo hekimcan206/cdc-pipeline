@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <Description>End-to-end measurements: commit-to-read-model and commit-to-index lag at several offered loads,
+      consumer drain throughput, and catch-up time after consumer downtime.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Confluent.Kafka" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\tests\CdcPipeline.TestKit\CdcPipeline.TestKit.csproj" />
+  </ItemGroup>
+
+</Project>
