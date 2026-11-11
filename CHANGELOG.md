@@ -35,6 +35,8 @@ All notable changes to this project are documented here. The format follows
   whether it converged in time; it now kills every 10th batch of 50 and uses static group membership (new optional
   `Consumer:GroupInstanceId`), so a restarted consumer takes its partitions back at once. As hardening, the source
   runs with `wal_sender_timeout=10s` and the connector retries its replication slot for up to 60 s.
+- On a GitHub runner the Oracle job filled the disk past Redpanda's 5 GiB free-space threshold and the broker refused
+  writes (`KAFKA_STORAGE_ERROR`); the threshold is now 1 GiB and the job frees runner disk first.
 
 [Unreleased]: https://github.com/hekimcan206/cdc-pipeline/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/hekimcan206/cdc-pipeline/releases/tag/v1.0.0
